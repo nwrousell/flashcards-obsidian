@@ -6,7 +6,7 @@ import { Anki } from "src/services/anki";
 import { noticeTimeout, flashcardsIcon } from "src/conf/constants";
 
 export default class ObsidianFlashcard extends Plugin {
-  private settings: ISettings;
+  settings: ISettings;
   private cardsService: CardsService;
 
   async onload() {
@@ -14,7 +14,8 @@ export default class ObsidianFlashcard extends Plugin {
 
     // TODO test when file did not insert flashcards, but one of them is in Anki already
     const anki = new Anki();
-    this.settings = (await this.loadData()) || this.getDefaultSettings();
+    const saved = (await this.loadData()) as Partial<ISettings> | null;
+    this.settings = { ...this.getDefaultSettings(), ...saved };
     this.cardsService = new CardsService(this.app, this.settings);
 
     const statusBar = this.addStatusBarItem();
@@ -38,7 +39,7 @@ export default class ObsidianFlashcard extends Plugin {
       id: "generate-flashcard-all-files",
       name: "Generate for all files in vault",
       callback: () => {
-        this.generateCardsForVault();
+        void this.generateCardsForVault();
       },
     });
 
@@ -55,18 +56,19 @@ export default class ObsidianFlashcard extends Plugin {
 
     this.registerInterval(
       window.setInterval(
-        () =>
-          anki
+        () => {
+          void anki
             .ping()
             .then(() => statusBar.setText("Anki"))
-            .catch(() => statusBar.setText("")),
+            .catch(() => statusBar.setText(""));
+        },
         15 * 1000,
       ),
     );
   }
 
-  async onunload() {
-    await this.saveData(this.settings);
+  onunload(): void {
+    void this.saveData(this.settings);
   }
 
   private getDefaultSettings(): ISettings {
@@ -131,7 +133,6 @@ export default class ObsidianFlashcard extends Plugin {
     let failed = 0;
     const tag = this.settings.flashcardsTag;
     const sep = this.settings.inlineSeparator;
-    const sepRev = this.settings.inlineSeparatorReverse;
 
     new Notice(`Flashcards: scanning ${files.length} files...`, noticeTimeout);
 
